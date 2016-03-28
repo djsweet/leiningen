@@ -17,10 +17,7 @@
 
 (defn read-test-project-with-user-profiles [name user-profiles]
   (with-redefs [user/profiles (constantly user-profiles)]
-    (let [project (project/read (format "test_projects/%s/project.clj" name))]
-      (project/init-project
-       (project/project-with-profiles-meta
-        project (merge @project/default-profiles (:profiles project)))))))
+    (project/read (format "test_projects/%s/project.clj" name))))
 
 (defn read-test-project [name]
   (read-test-project-with-user-profiles name {}))

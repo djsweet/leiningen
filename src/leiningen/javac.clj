@@ -217,12 +217,6 @@
                          (string/starts-with? % "@@"))
                     args))))
 
-;; Pure java projects will not have Clojure on the classpath. As such, we need
-;; to add it if it's not already there.
-(def subprocess-profile
-  {:dependencies [^:displace ['org.clojure/clojure (clojure-version)]]
-   :eval-in :subprocess})
-
 (defn- subprocess-form
   "Creates a form for running javac in a subprocess."
   [compile-path files javac-opts]
@@ -243,12 +237,22 @@
                "rather than a JRE by modifying PATH or setting JAVA_CMD."))))
 
 (defn javac-project-for-subprocess
-  "Merge profiles to create project appropriate for javac subprocess.  This
-  function is mostly extracted to simplify testing, to validate that settings
+  "Alter the given project so that it is appropriate for a javac subprocess. We
+  can't merge in a new profile here, because this causes subtle problems with
+  target directory selection, so we just hand-jam in the necessary values. This
+  function is also extracted to simplify testing, to validate that settings
   like `:local-repo` and `:mirrors` are respected."
-  [project subprocess-profile]
-  (-> (project/merge-profiles project [subprocess-profile])
-      (project/retain-whitelisted-keys project)))
+  [project]
+  (-> project
+      (assoc  :eval-in :subprocess)
+      ;; Pure java projects will not have Clojure on the classpath. As such, we need
+      ;; to add it if it's not already there.
+      (update :dependencies
+              (fn [deps]
+                (if (nil? deps)
+                  [['org.clojure/clojure (clojure-version)]]
+                  (conj (vec (filter #(not= (first %) 'org.clojure/clojure) deps))
+                        ['org.clojure/clojure (clojure-version)]))))))
 
 ;; We can't really control what is printed here. We're just going to
 ;; allow `.run` to attach in, out, and err to the standard streams. This
@@ -278,7 +282,7 @@
       (try
         (binding [eval/*pump-in* false]
           (eval/eval-in
-           (javac-project-for-subprocess project subprocess-profile)
+           (javac-project-for-subprocess project)
            form))
         (catch Exception e
           (if-let [exit-code (:exit-code (ex-data e))]

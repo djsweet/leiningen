@@ -1,8 +1,14 @@
 (ns leiningen.test.javac
-  (:require [clojure.string :as string])
-  (:import [java.io BufferedReader StringReader])
+  (:require [clojure.string :as string]
+            [clojure.java.io :as io]
+            [clojure.pprint :as pprint]
+            [leiningen.core.project :as project]
+            [leiningen.clean :refer [clean]]
+            [leiningen.with-profile :refer [with-profile]]
+            [leiningen.test.helper :refer [java-main-project
+                                           with-system-out-str]])
+  (:import [java.io BufferedReader File StringReader])
   (:use [clojure.test]
-        [clojure.java.io :only [file]]
         [leiningen.javac :only [javac
                                 normalize-javac-options
                                 uncommented-lines-from-reader
@@ -34,10 +40,10 @@
   test-javac
   #_(delete-file-recursively (:compile-path dev-deps-project) true)
   #_(javac dev-deps-project)
-  (is (.exists (file "test_projects/dev-deps-only/classes"
-                     "dev_deps_only" "Junk.class")))
-  (is (.exists (file "test_projects/dev-deps-only/classes"
-                     "dev_deps_only" "Junk2.class"))))
+  (is (.exists (io/file "test_projects/dev-deps-only/classes"
+                        "dev_deps_only" "Junk.class")))
+  (is (.exists (io/file "test_projects/dev-deps-only/classes"
+                        "dev_deps_only" "Junk2.class"))))
 
 (defn- inject-newlines [& args]
   (string/join (System/getProperty "line.separator") args))
@@ -195,3 +201,16 @@
                      test-data-offset)
             false)
           (recur (rest test-data-queue) (inc test-data-offset)))))))
+
+(deftest test-javac-does-not-alter-target-path
+  (testing "javac does not alter :target-path"
+    (let [prepared-project (project/init-project java-main-project)]
+      (clean prepared-project)
+      (with-system-out-str (with-profile prepared-project "base,dev" "run"))
+      (let [target-path       (.substring (:target-path prepared-project)
+                                          0
+                                          (.lastIndexOf (:target-path prepared-project) (File/separator)))
+            target-path-files (.list (io/file target-path))]
+        (println target-path)
+        (and (is (= (count target-path-files) 1))
+             (is (= (first target-path-files) "base+dev")))))))

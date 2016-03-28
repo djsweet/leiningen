@@ -147,8 +147,8 @@
                           "java-main"
                           {:user user-profile}))
         javac-project (atom {})
-        javac-project-hook (fn [f proj profile]
-                             (let [new-project (f proj profile)]
+        javac-project-hook (fn [f proj]
+                             (let [new-project (f proj)]
                                (reset! javac-project new-project)
                                new-project))]
     (hooke/with-scope
